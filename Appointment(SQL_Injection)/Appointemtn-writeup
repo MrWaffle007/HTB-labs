@@ -1,64 +1,67 @@
-Appointment Write-up
+# Appointment — Write-up
 
-Category: Web Applications / SQL Injection
+**Category:** Web Applications / SQL Injection
+**Difficulty:** Normal
 
-Difficulty:normal
+> IP and flag are shown in the images included in this folder.
 
-Note:IP and flag shown in images in folder
+## Overview
 
-Overview
+This challenge involved a login form on a web application. The goal was to enumerate the target for hidden content, then find a way past authentication without knowing a valid password. The result was a SQL Injection authentication bypass.
 
-This challenge involved a login form on a web application. The goal was to enumerate the target for hidden content, then find a way past authentication without knowing a valid password. The end result was a SQL Injection authentication bypass.
+## Step 1 — Default Credentials
 
-Step 1 — Default Credentials
+First step was to try common default username/password pairs directly on the login form:
 
-first step was to try common default username/password pairs directly on the login form:
-
-
+```
 admin:admin
 guest:guest
 user:user
 root:root
 administrator:password
+```
 
+None of these worked. Brute-forcing the login form with a wordlist was an option, but it wasn't attempted.
 
-None of these worked. Brute forcing the login form with a wordlist was an option but didnt attempt
-
-Step 2 — Testing for SQL Injection
+## Step 2 — Testing for SQL Injection
 
 The login form looked like a good candidate for SQL Injection, since it almost certainly checks credentials against a backend database with a query along these lines:
 
-sql
-
+```sql
 SELECT * FROM users WHERE username='$username' AND password='$password'
+```
 
-
-If the application doesn't sanitize input, I can inject characters that change the meaning of that query. A single quote (`'`) closes the string early, and a `#` starts a comment in SQL — anything after it is ignored by the database.
+If the application doesn't sanitize input, injected characters can change the meaning of that query. A single quote (`'`) closes the string early, and a `#` starts a comment in SQL — anything after it is ignored by the database.
 
 I entered the following into the login form:
 
-Username:admin'#
-
-Password:pass123  (doesnt matter)
-
+| Field | Value |
+|---|---|
+| Username | `admin'#` |
+| Password | `pass123` (doesn't matter) |
 
 This turns the backend query into:
 
-sql
-
-SELECT * FROM users WHERE username='admin'#' AND password='abc123'
-
+```sql
+SELECT * FROM users WHERE username='admin'#' AND password='pass123'
+```
 
 Everything from the `#` onward is treated as a comment, so the password check never actually happens — the query just becomes "find the user named admin." As long as an `admin` account exists in the users table, the query returns exactly one row, and the application's login logic treats that as a successful authentication.
 
-Step 3 — Result
+## Step 3 — Result
 
-Submitting the form with this payload logged me in as `admin` without ever knowing the real password, and the application presented the flag on the resulting page. (image attached)
+Submitting the form with this payload logged me in as `admin` without ever knowing the real password, and the application presented the flag on the resulting page.
 
-Summary
+![Flag](appointment_3.png)
 
- Step  Action | Finding 
+## Summary
 
-1 Default credential testing No valid combination found 
-2 SQL Injection (`admin'#`) |Password check bypassed via comment injection
-3 Submit login form Authenticated as admin, flag retrieved
+| Step | Action | Finding |
+|---|---|---|
+| 1 | Default credential testing | No valid combination found |
+| 2 | SQL Injection (`admin'#`) | Password check bypassed via comment injection |
+| 3 | Submit login form | Authenticated as admin, flag retrieved |
+
+## Takeaway
+
+The login form built its SQL query by directly concatenating user input instead of using parameterized queries, allowing a single quote and comment symbol to bypass authentication entirely. The fix is straightforward, use prepared statements, validate/escape input, and never build SQL strings by hand.

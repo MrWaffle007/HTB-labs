@@ -1,51 +1,77 @@
-HTB: Meow  Write-up
+# HTB: Meow — Write-up
 
-Difficulty: Easy
+**Difficulty:** Easy
 
-Note: No target IP is listed in this write-up, as it was completed after the lab session ended and the machine was shut down.
-Overview
+> Note: No target IP is listed in this write-up, as it was completed after the lab session ended and the machine was shut down.
+
+## Overview
 
 Meow is designed to teach the basics of enumeration and remote access. The goal is a single flag obtained via an unauthenticated Telnet service running default credentials (no password).
 
-Environment Setup
-    1. Spawned the target machine and started the HTB Pwnbox instance from the browser.
+## Environment Setup
 
-    2. Opened a terminal within Pwnbox to begin enumeration. 
+1. Spawned the target machine and started the HTB Pwnbox instance from the browser.
+2. Opened a terminal within Pwnbox to begin enumeration.
 
-Step 1 — Connectivity Check
+## Step 1 — Connectivity Check
 
 Before scanning, confirmed the target was reachable:
+
+```bash
 ping <target-ip>
+```
+
 Received replies, confirming the host was up and network connectivity to the target was working.
 
-Step 2 — Port Scanning
+## Step 2 — Port Scanning
 
 Ran an Nmap service scan against the target to identify open ports and running services:
+
+```bash
 sudo nmap -sV <target-ip>
-    • -sV enables version detection, so Nmap reports service and version running on each. 
-Result: Port 23/tcp (Telnet) was open.
+```
 
-Step 3 — Service Access
+- `-sV` enables version detection, so Nmap reports the service and version running on each open port.
 
-Telnet is an old, unencrypted remote-access protocol and could be opened due to weak or default credentials. Connected directly:
+**Result:** Port `23/tcp` (Telnet) was open.
+
+## Step 3 — Service Access
+
+Telnet is an old, unencrypted remote-access protocol, and access here was possible due to weak/default credentials. Connected directly:
+
+```bash
 telnet <target-ip>
-At the login prompt, tried the default username:
-login: admin
-No password was set for the admin account, and the login succeeded with a blank password granting immediate access to the target.
+```
 
-Step 4 — Locating and Reading the Flag
+At the login prompt, tried the default username:
+
+```
+login: admin
+```
+
+No password was set for the `admin` account, and the login succeeded with a blank password — granting immediate access to the target.
+
+## Step 4 — Locating and Reading the Flag
 
 Once logged in, enumerated the current directory for the flag file:
+
+```bash
 ls
-This revealed flag.txt. Read its contents:
+```
+
+This revealed `flag.txt`. Read its contents:
+
+```bash
 cat flag.txt
+```
+
 This returned the flag, completing the challenge.
 
-Summary
+## Summary
 
-Step	Action	Finding
-1	ping	Host is up
-2	nmap -sV	Port 23 (Telnet) open
-3	telnet + admin / blank password	Unauthenticated shell access
-4	ls / cat flag.txt	Flag retrieved
-
+| Step | Action | Finding |
+|---|---|---|
+| 1 | `ping` | Host is up |
+| 2 | `nmap -sV` | Port 23 (Telnet) open |
+| 3 | `telnet` + `admin` / blank password | Unauthenticated shell access |
+| 4 | `ls` / `cat flag.txt` | Flag retrieved |

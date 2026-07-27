@@ -1,0 +1,89 @@
+# Fawn (ftp) — Write-up
+
+**Category:** Network Enumeration / FTP
+**Difficulty:** Very Easy
+
+## Overview
+
+This box focused on the fundamentals of scanning and interacting with an exposed FTP service. The target was running FTP with anonymous login enabled — a common misconfiguration where the server accepts the `anonymous` username with any (or no) password, granting file access without real authentication.
+
+## Step 1 — Connectivity Check
+
+Before scanning, I confirmed my VPN connection to the target was up and that the host was actually reachable:
+
+```bash
+ping <target-ip>
+```
+
+Low-overhead by design — it's a quick way to confirm the tunnel is live and the target is responding before committing to a full scan. Got replies back, so I moved on.
+## Step 2 — Port Scanning
+
+Ran an Nmap version-detection scan to see what services were exposed:
+
+```bash
+sudo nmap -sV <target-ip>
+```
+
+`-sV` takes a bit longer than a basic scan but reports the actual service version running on each open port — useful for spotting outdated software or narrowing down an attack path at a glance.
+
+**Result:** Port `21/tcp` (FTP) was open.
+
+## Step 3 — Connecting to the FTP Service
+
+Connected to the target:
+
+```bash
+ftp <target-ip>
+```
+
+At the username prompt, I tried the classic FTP misconfiguration test the `anonymous` account:
+
+```
+Name: anonymous
+Password: (blank)
+```
+
+FTP servers with anonymous access enabled disregard the password entirely for this account. Login succeeded immediately, dropping me into an authenticated FTP session with no credentials needed.
+
+## Step 4 — Browsing and Retrieving the Flag
+
+Once connected, I listed the available files:
+
+```bash
+ls
+```
+
+`flag.txt` was sitting right there in the directory. Downloaded it to my local machine with:
+
+```bash
+get flag.txt
+```
+
+This pulled the file down to whatever local directory I'd launched the `ftp` command from. Exited the session:
+
+```bash
+bye
+```
+
+...and confirmed the file was now sitting locally:
+
+```bash
+cat flag.txt
+```
+
+That returned the flag, completing the box.
+
+![Flag](fawn_1.png)
+
+## Summary
+
+| Step | Action | Finding |
+|---|---|---|
+| 1 | `ping` | Host is up |
+| 2 | `nmap -sV` | Port 21 (FTP) open |
+| 3 | `ftp` login as `anonymous` | Unauthenticated access granted |
+| 4 | `ls` / `get flag.txt` | Flag downloaded and read |
+
+## Takeaway
+
+FTP was never designed with confidentiality in mind — by default it transmits everything, including credentials, in plaintext, making it vulnerable to interception via Man-in-the-Middle attacks unless it's wrapped in SSL/TLS (FTPS) or tunneled through SSH (SFTP). On top of that, anonymous login being left enabled turns the service into an open file share for anyone who finds it. This box is a clean example of why FTP should either be disabled in favor of SFTP, or at minimum have anonymous access explicitly turned off and credentials enforced.
