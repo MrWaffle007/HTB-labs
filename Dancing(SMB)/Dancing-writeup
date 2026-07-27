@@ -1,0 +1,113 @@
+# Dancing (Smb)— Write-up
+
+**Category:** Network Enumeration / SMB
+**Difficulty:** Very Easy
+
+## Overview
+
+Dancing focuses on enumerating and interacting with an SMB (Server Message Block) share. SMB lets clients access files and other resources on a remote server over the network, and shares are supposed to require valid credentials — but misconfigurations that allow guest or anonymous logins are common enough to be worth checking every time. This box was exactly that: one of several shares had been left open with no real authentication.
+
+## Step 1 — Port Scanning
+
+Started with an Nmap version-detection scan against the target:
+
+```bash
+sudo nmap -sV <target-ip>
+```
+
+- `-sV` probes open ports to determine the service and version running on each.
+
+**Result:** Port `445/tcp` (SMB) was open, indicating an active share worth exploring.
+
+## Step 2 — Listing Available Shares
+
+Used `smbclient` to enumerate what shares existed on the host:
+
+```bash
+smbclient -L <target-ip>
+```
+
+- `-L` lists the shares available on the target host.
+
+When prompted for a username, I used my local machine's username (smbclient falls back to it automatically if none is specified, since SMB requires *some* username to attempt a connection). Left the password blank to test for guest/anonymous access.
+
+**Result:** Four shares were listed:
+
+| Share | Description |
+|---|---|
+| `ADMIN$` | Hidden administrative share for remote access to disk volumes |
+| `C$` | Administrative share for the `C:\` volume — where the OS is hosted |
+| `IPC$` | Inter-process communication share (not browsable, no files) |
+| `WorkShares` | Custom share — likely human-configured, and the most promising target |
+
+## Step 3 — Testing Access to Each Share
+
+Attempted to connect to each browsable share with blank credentials:
+
+```bash
+smbclient \\<target-ip>\ADMIN$
+```
+Result: `NT_STATUS_ACCESS_DENIED` — properly locked down.
+
+```bash
+smbclient \\<target-ip>\C$
+```
+Result: same — access denied.
+
+```bash
+smbclient \\<target-ip>\WorkShares
+```
+**Result:** Success. No valid credentials were required, and the prompt changed to `smb: \>`, confirming an active session on the share.
+
+## Step 4 — Navigating the Share
+
+Inside the SMB shell, ran `help` to confirm available commands — mostly familiar Linux-style navigation:
+
+- `ls` — list contents of the current directory
+- `cd` — change directory
+- `get` — download a file from the share
+- `exit` — leave the SMB shell
+
+Listing the root of the share revealed two directories: `Amy.J` and `James.P`.
+
+Inside `Amy.J`, found `worknotes.txt` and pulled it down:
+
+```bash
+get worknotes.txt
+```
+
+Inside `James.P`, found the target file:
+
+```bash
+get flag.txt
+```
+
+## Step 5 — Reading the Flag
+
+Exited the SMB shell:
+
+```bash
+exit
+```
+
+Both files were now sitting locally in the directory `smbclient` was launched from. Read the flag:
+
+```bash
+cat flag.txt
+```
+
+This returned the flag, completing the box. (`worknotes.txt` was a red herring / lore file in this case — no further use for it here.)
+
+## Summary
+
+| Step | Action | Finding |
+|---|---|---|
+| 1 | `nmap -sV` | Port 445 (SMB) open |
+| 2 | `smbclient -L` | Four shares found: `ADMIN$`, `C$`, `IPC$`, `WorkShares` |
+| 3 | Blank-credential login attempts | `ADMIN$`/`C$` denied, `WorkShares` accessible |
+| 4 | `ls` / `cd` / `get` | Retrieved `worknotes.txt` and `flag.txt` |
+| 5 | `cat flag.txt` | Flag retrieved |
+
+## Takeaway
+
+The default administrative shares (`ADMIN$`, `C$`) were properly locked down, which is expected — but the custom `WorkShares` share had been configured without any authentication requirement, allowing anyone on the network to browse and download its contents. This is a good reminder that custom shares set up for convenience are often the weakest link, even when the built-in system shares are configured correctly.
