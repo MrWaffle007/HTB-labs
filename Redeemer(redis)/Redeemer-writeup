@@ -1,0 +1,94 @@
+# HTB: Redeemer (redis) — Write-up
+
+**Difficulty:** Easy
+
+## Overview
+
+Redeemer is designed to teach the basics of enumerating and interacting with a Redis database. The goal is a single flag retrieved from an unauthenticated Redis instance with no password configured.
+
+## Environment Setup
+
+1. Virtualbox with kali linux setup and connected to an openvpn to the target
+2. Opened a terminal within kali to begin enumeration.
+
+## Step 1 — Connectivity Check
+
+Before scanning, confirmed the target was reachable:
+
+```bash
+ping 10.129.198.237
+```
+
+Received replies, confirming the host was up and network connectivity to the target was working.
+
+## Step 2 — Port Scanning
+
+Ran an Nmap service scan against the target to identify open ports and running services:
+
+```bash
+nmap -p- -sV -T5 10.129.198.237
+```
+- `-p-`  scan all 65,535 TCP ports, instead of just the default top 1,000.useful when a default scan comes back empty or you suspect a service is running on a nonstandard port.
+- `-sV` enables version detection, so Nmap reports the service and version running on each open port.
+- `-T5`  timing template, controls scan speed/aggressiveness. Templates range from -T0 (paranoid, very slow) to -T5 (insane, fastest possible). -T5 sends probes rapidly with minimal delay between them
+**Result:** Port `6379/tcp` (Redis) was open — the only port exposed on the host.
+
+![Flag](Redeemer_1.png)
+
+## Step 3 — Service Access
+
+Redis is an in-memory key-value database. By default, it does not require authentication unless explicitly configured with a password (`requirepass`).
+```bash
+redis-cli -h 
+```
+![Flag](Redeemer_2.png)
+- `-h` points the client at the target host instead of the local default.
+
+The connection succeeded immediately with no credentials required, dropping into an interactive Redis prompt.
+
+## Step 4 — Enumerating the Database
+
+Ran the `INFO` command to pull server metadata and statistics:
+
+```
+INFO
+```
+
+The `Keyspace` section of the output showed a single logical database at index `0`. Selected it:
+
+```
+SELECT 0
+```
+
+Listed all keys stored inside:
+
+```
+KEYS *
+```
+![Flag](Redeemer_3.png)
+This revealed a key holding the flag data.
+
+## Step 5 — Retrieving the Flag
+
+Read the value of the identified key:
+
+```
+GET flag
+```
+
+This returned the flag, completing the challenge.
+
+## Summary
+
+| Step | Action | Finding |
+|---|---|---|
+| 1 | `ping` | Host is up |
+| 2 | `nmap -sV` | Port 6379 (Redis) open |
+| 3 | `redis-cli -h <target-ip>` | Unauthenticated access, no password required |
+| 4 | `INFO` / `SELECT 0` / `KEYS *` | Located key holding the flag |
+| 5 | `GET <key_name>` | Flag retrieved |
+
+## Takeaways
+
+- Redis has no authentication enabled by default — an exposed, unconfigured instance allows full read/write access to anyone who can reach it on the network.
+- `INFO`, `SELECT`, and `KEYS *` alone are enough to fully enumerate an unprotected Redis database.
